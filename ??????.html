@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人脸签到系统</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%2316a34a'/%3E%3Ccircle cx='9' cy='10' r='1.5' fill='white'/%3E%3Ccircle cx='15' cy='10' r='1.5' fill='white'/%3E%3Cpath d='M8 15c1.2 1.3 2.6 2 4 2s2.8-.7 4-2' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0f1117;
+  --panel:#181c26;
+  --panel2:#202634;
+  --line:#2a3140;
+  --text:#e8ecf3;
+  --muted:#93a0b4;
+  --accent:#16a34a;
+  --accent2:#15803d;
+  --warn:#d97706;
+  --danger:#dc2626;
+  --ok:#16a34a;
+  --radius:14px;
+}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Noto Sans SC",system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  min-height:100vh;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px;}
+/* ===== 顶栏 ===== */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 20px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-icon{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#059669);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.brand h1{font-size:22px;font-weight:900;letter-spacing:.5px;}
+.brand p{font-size:13px;color:var(--muted);margin-top:2px;}
+.status-pill{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:13px;color:var(--muted);}
+.status-dot{width:10px;height:10px;border-radius:50%;background:var(--warn);}
+.status-dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent);}
+/* ===== 导航 ===== */
+.nav{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px;margin-bottom:20px;overflow-x:auto;}
+.nav-btn{flex:1;min-width:120px;padding:12px 10px;border:none;background:transparent;color:var(--muted);font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;font-family:inherit;transition:.15s;}
+.nav-btn.active{background:var(--accent);color:#fff;}
+.nav-btn:not(.active):hover{color:var(--text);background:var(--panel2);}
+/* ===== 视图容器 ===== */
+.view{display:none;}
+.view.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* ===== 通用卡片 ===== */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;}
+.panel + .panel{margin-top:16px;}
+.ptitle{font-size:16px;font-weight:900;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.psub{font-size:13px;color:var(--muted);margin-bottom:16px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:760px){.grid-2{grid-template-columns:1fr;}}
+/* ===== 摄像头 ===== */
+.cam-box{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;aspect-ratio:4/3;}
+.cam-box video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1);}
+.cam-box canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+.cam-mask{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);font-size:14px;background:rgba(0,0,0,.35);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover:not(:disabled){background:var(--accent2);}
+.btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
+.btn-ghost:hover{background:var(--line);}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-warn{background:var(--warn);color:#fff;}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+/* ===== 表单 ===== */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:700;}
+.input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;font-family:inherit;}
+.input:focus{outline:2px solid var(--accent);border-color:transparent;}
+textarea.input{resize:vertical;min-height:120px;}
+/* ===== 名单表格 ===== */
+.list-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+.list-toolbar .input{flex:1;min-width:160px;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);}
+th{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.3px;background:var(--panel2);}
+tr:hover td{background:rgba(255,255,255,.02);}
+.tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+.tag-on{background:rgba(22,163,74,.15);color:#4ade80;}
+.tag-off{background:rgba(220,38,38,.15);color:#f87171;}
+.tag-ok{background:rgba(22,163,74,.2);color:#4ade80;}
+.tag-wait{background:rgba(147,160,180,.12);color:var(--muted);}
+.tag-absent{background:rgba(220,38,38,.15);color:#f87171;}
+.tag-active{background:rgba(217,119,6,.2);color:#fbbf24;}
+.mini-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;}
+.mini-btn:hover{color:var(--text);background:var(--line);}
+/* ===== 统计卡 ===== */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr);}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;text-align:center;}
+.stat .num{font-size:28px;font-weight:900;line-height:1;}
+.stat .lbl{font-size:12px;color:var(--muted);margin-top:8px;}
+/* ===== 日志 ===== */
+.log-console{background:#0b0d12;border:1px solid var(--line);border-radius:10px;padding:14px;height:260px;overflow:auto;font-family:Consolas,"Courier New",monospace;font-size:12px;line-height:1.7;color:#a7f3d0;white-space:pre-wrap;word-break:break-all;}
+.log-console .ts{color:#6b7280;}
+/* ===== Toast ===== */
+#toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-120%);background:#1f2937;color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:99;transition:.3s;max-width:90vw;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.ok{background:var(--accent);}
+#toast.err{background:var(--danger);}
+.empty{padding:30px;text-align:center;color:var(--muted);font-size:14px;}
+.face-note{font-size:12px;color:var(--muted);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">👤</div>
+      <div>
+        <h1>人脸签到系统</h1>
+        <p>录入 / 刷脸 / 名单 / 日志 全部本地完成</p>
+      </div>
+    </div>
+    <div class="status-pill"><span class="status-dot" id="modelDot"></span><span id="modelStatus">模型加载中…</span></div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" data-view="checkin">刷脸签到</button>
+    <button class="nav-btn" data-view="enroll">录入人脸</button>
+    <button class="nav-btn" data-view="roster">名单管理</button>
+    <button class="nav-btn" data-view="log">签到日志</button>
+  </div>
+
+  <!-- ===== 视图：刷脸签到 ===== -->
+  <div class="view active" id="view-checkin">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="ptitle">📷 摄像头</div>
+        <div class="psub">对着摄像头，系统会自动识别你是谁</div>
+        <div class="cam-box">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="canvas"></canvas>
+          <div class="cam-mask" id="mask"><span>点击下方「开启摄像头」开始签到</span></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="startCam">开启摄像头</button>
+          <button class="btn btn-ghost" id="stopCam" disabled>关闭</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">✅ 识别结果</div>
+        <div class="psub" id="checkinResult">等待识别…</div>
+        <div style="font-size:40px;text-align:center;padding:10px 0;min-height:60px;" id="checkinName">—</div>
+        <div style="text-align:center;color:var(--muted);font-size:13px;" id="checkinTime"></div>
+        <div class="btn-row" id="checkinActions" style="justify-content:center;display:none;">
+          <button class="btn btn-primary" id="confirmCheckin">确认签到</button>
+          <button class="btn btn-ghost" id="cancelCheckin">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图：录入人脸 ===== -->
+  <div class="view" id="view-enroll">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="ptitle">📷 录入人脸</div>
+        <div class="psub">面向摄像头，保持光线充足、正对镜头，然后点击采集</div>
+        <div class="cam-box">
+          <video id="video2" autoplay playsinline muted></video>
+          <canvas id="canvas2"></canvas>
+          <div class="cam-mask" id="mask2"><span>点击「开启摄像头」后开始录入</span></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="startCam2">开启摄像头</button>
+          <button class="btn btn-primary" id="captureFace" disabled>采集当前人脸</button>
+        </div>
+        <div class="face-note">建议正面、无遮挡、光线良好，采集一次即可完成录入。</div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">✍️ 填写信息</div>
+        <div class="psub">给这张人脸起一个名字，然后保存</div>
+        <div class="field"><label>姓名</label><input class="input" id="enrollName" placeholder="输入姓名，如：张三"></div>
+        <div class="field"><label>预览</label>
+          <div id="enrollPreview" style="width:100%;height:140px;border-radius:10px;background:var(--panel2);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">采集后将在此显示人脸截图</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="saveEnroll" disabled>保存录入</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图：名单管理 ===== -->
+  <div class="view" id="view-roster">
+    <div class="panel">
+      <div class="ptitle">📋 本次签到名单</div>
+      <div class="psub">填写本次需要到场的人员，点「生效」后成为本次签到目标；点「失效」则名单作废</div>
+      <div class="list-toolbar">
+        <input class="input" id="newName" placeholder="输入姓名，回车或点添加">
+        <button class="btn btn-ghost" id="addName">添加</button>
+        <button class="btn btn-warn" id="rosterOn">生效名单</button>
+        <button class="btn btn-danger" id="rosterOff" disabled>失效名单</button>
+      </div>
+      <div id="rosterStatus" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th style="width:8%">序号</th><th style="width:28%">姓名</th><th style="width:22%">状态</th><th style="width:32%">签到情况</th><th style="width:10%">操作</th></tr></thead>
+          <tbody id="rosterBody"></tbody>
+        </table>
+      </div>
+      <div id="rosterEmpty" class="empty">名单为空，请在左侧输入姓名添加</div>
+    </div>
+    <div class="panel">
+      <div class="ptitle">📊 签到统计</div>
+      <div class="stats">
+        <div class="stat"><div class="num" id="stTotal">0</div><div class="lbl">名单人数</div></div>
+        <div class="stat"><div class="num" id="stSigned">0</div><div class="lbl">已签到</div></div>
+        <div class="stat"><div class="num" id="stAbsent">0</div><div class="lbl">未签到</div></div>
+        <div class="stat"><div class="num" id="stRate">0%</div><div class="lbl">签到率</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图：签到日志 ===== -->
+  <div class="view" id="view-log">
+    <div class="panel">
+      <div class="ptitle">📄 签到日志</div>
+      <div class="psub">记录每一次签到，可导出为 .log 文件</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px;">
+        <button class="btn btn-primary" id="exportLog">导出 .log 文件</button>
+        <button class="btn btn-ghost" id="clearLog">清空日志</button>
+      </div>
+      <div class="log-console" id="logConsole"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script>
+/* ================= 状态 ================= */
+const STATE = {
+  modelReady:false,
+  camOn:false,
+  streams:{},       // checkin / enroll
+  people:[],        // [{id,name,desc:Float32Array(128),photo(dataURL)}]
+  roster:{active:false,names:[]},  // 本次名单
+  logs:[],          // [{t, name, action}]
+  lastDetect:null,  // 最近识别到的人
+  pendingPhoto:null,
+  pendingDesc:null,
+  isChecking:false,
+};
+
+const DB_KEY = 'faceSignDB_v1';
+const LOG_KEY = 'faceSignLogs_v1';
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+
+/* ================= 工具 ================= */
+function $(id){return document.getElementById(id);}
+function toast(msg,type){
+  const t=$('toast'); t.textContent=msg; t.className=type?'show '+type:'show';
+  setTimeout(()=>t.className='',2200);
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadDB(){try{const d=JSON.parse(localStorage.getItem(DB_KEY)||'null');if(d&&d.people)STATE.people=d.people;if(d&&d.roster)STATE.roster=d.roster;}catch(e){STATE.people=[];STATE.roster={active:false,names:[]};}}
+function saveDB(){localStorage.setItem(DB_KEY,JSON.stringify({people:STATE.people,roster:STATE.roster}));}
+function loadLogs(){try{STATE.logs=JSON.parse(localStorage.getItem(LOG_KEY)||'[]');}catch(e){STATE.logs=[];}}
+function saveLogs(){localStorage.setItem(LOG_KEY,JSON.stringify(STATE.logs));}
+function addLog(name,action){
+  STATE.logs.push({t:new Date().toISOString(),name:name,action:action});
+  if(STATE.logs.length>1000)STATE.logs=STATE.logs.slice(-1000);
+  saveLogs(); renderLog();
+}
+function nowStr(){
+  const d=new Date();const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtLogTime(iso){
+  const d=new Date(iso);const p=n=>String(n).padStart(2,'0');
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/* ================= 模型加载 ================= */
+async function initModel(){
+  const dot=$('modelDot'),st=$('modelStatus');
+  try{
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    STATE.modelReady=true;
+    dot.className='status-dot on'; st.textContent='模型就绪';
+    toast('人脸识别模型加载完成','ok');
+  }catch(e){
+    dot.className='status-dot'; st.textContent='模型加载失败';
+    toast('模型加载失败，请检查网络：'+e.message,'err');
+    console.error(e);
+  }
+}
+
+/* ================= 摄像头 ================= */
+async function startCam(key,el){
+  if(STATE.camOn){return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},facingMode:'user'},audio:false});
+    STATE.streams[key]=stream;
+    const v=key==='checkin'?$('video'):$('video2');
+    const m=key==='checkin'?$('mask'):$('mask2');
+    v.srcObject=stream; await v.play();
+    if(key==='checkin'){$('startCam').disabled=true;$('stopCam').disabled=false;}
+    else{$('startCam2').disabled=true;$('captureFace').disabled=!STATE.modelReady;}
+    m.style.display='none';
+    STATE.camOn=true;
+    if(key==='checkin')loopCheckin();
+  }catch(e){
+    toast('无法开启摄像头：'+e.message,'err');
+  }
+}
+function stopCam(key){
+  const s=STATE.streams[key]; if(s){s.getTracks().forEach(t=>t.stop()); delete STATE.streams[key];}
+  if(key==='checkin'){
+    $('startCam').disabled=false;$('stopCam').disabled=true;$('mask').style.display='flex';
+    STATE.isChecking=false;
+  }else{
+    $('startCam2').disabled=false;$('captureFace').disabled=true;$('mask2').style.display='flex';
+  }
+  STATE.camOn=STATE.streams.checkin||STATE.streams.enroll?true:false;
+}
+
+/* ================= 签到循环 ================= */
+async function loopCheckin(){
+  if(!STATE.modelReady||!STATE.streams.checkin||STATE.isChecking)return;
+  STATE.isChecking=true;
+  try{
+    const v=$('video'),c=$('canvas');
+    if(v.videoWidth>0){
+      const box={width:v.videoWidth,height:v.videoHeight};
+      const det=await faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:320})).withFaceLandmarks().withFaceDescriptor();
+      if(det){
+        drawBox(c,det,box);
+        const match=matchPerson(det.descriptor);
+        if(match){ showCheckin(match); }
+        else { resetResult('未识别 / 名单外人员'); }
+      }else{
+        clearCanvas(c); resetResult('未检测到人脸');
+      }
+    }
+  }catch(e){}
+  STATE.isChecking=false;
+  if(STATE.streams.checkin)setTimeout(loopCheckin,250);
+}
+function drawBox(c,det,box){
+  const ctx=c.getContext('2d');
+  const sw=c.width/box.width, sh=c.height/box.height;
+  ctx.clearRect(0,0,c.width,c.height);
+  const x=det.detection.box.x*sw, y=det.detection.box.y*sh, w=det.detection.box.width*sw, h=det.detection.box.height*sh;
+  ctx.strokeStyle='#16a34a';ctx.lineWidth=3;
+  ctx.strokeRect(x,y,w,h);
+}
+function clearCanvas(c){const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);}
+
+/* ================= 人脸匹配 ================= */
+function matchPerson(desc){
+  let best=null,bestDist=0.6; // 阈值：越小人脸越接近
+  for(const p of STATE.people){
+    if(!p.desc)continue;
+    const dist=euclid(desc,new Float32Array(p.desc));
+    if(dist<bestDist){bestDist=dist;best=p;}
+  }
+  return best;
+}
+function euclid(a,b){let s=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];s+=d*d;}return Math.sqrt(s);}
+
+function showCheckin(p){
+  $('checkinName').textContent='👋 '+p.name;
+  $('checkinResult').textContent='识别到：'+p.name+'（相似度匹配成功）';
+  $('checkinActions').style.display='flex';
+  $('checkinTime').textContent='';
+  STATE.lastDetect=p;
+}
+function resetResult(msg){
+  $('checkinResult').textContent=msg;
+  $('checkinActions').style.display='none';
+  STATE.lastDetect=null;
+}
+
+/* ================= 签到确认 ================= */
+$('confirmCheckin').onclick=function(){
+  if(!STATE.lastDetect)return;
+  const p=STATE.lastDetect;
+  // 是否在名单内
+  if(STATE.roster.active && !STATE.roster.names.includes(p.name)){
+    toast('此人不在本次名单内，不记录签到','err');
+    addLog(p.name,'刷脸（名单外，未签）');
+    resetResult('名单外人员，未记录签到');
+    return;
+  }
+  $('checkinTime').textContent='签到时间：'+nowStr();
+  addLog(p.name,'签到成功');
+  toast('已记录：'+p.name+' 签到','ok');
+  resetResult('签到成功：'+p.name);
+  renderRoster();
+};
+$('cancelCheckin').onclick=function(){resetResult('已取消');toast('已取消本次识别');};
+
+/* ================= 录入 ================= */
+$('captureFace').onclick=async function(){
+  if(!STATE.streams.enroll||!STATE.modelReady){toast('请先开启摄像头');return;}
+  try{
+    const v=$('video2'),c=$('canvas2');
+    const det=await faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({inputSize:320})).withFaceLandmarks().withFaceDescriptor();
+    if(!det){toast('未检测到人脸，请正对镜头','err');return;}
+    // 截图预览
+    const tmp=document.createElement('canvas');
+    tmp.width=v.videoWidth;tmp.height=v.videoHeight;
+    const tctx=tmp.getContext('2d');
+    tctx.translate(v.videoWidth,0);tctx.scale(-1,1);
+    tctx.drawImage(v,0,0);
+    const photo=tmp.toDataURL('image/jpeg',0.85);
+    $('enrollPreview').style.background=`url(${photo}) center/cover`;
+    $('enrollPreview').innerHTML='';
+    STATE.pendingPhoto=photo; STATE.pendingDesc=Array.from(det.descriptor);
+    $('saveEnroll').disabled=false;
+    toast('人脸采集成功，填好名字后保存','ok');
+    // 画框
+    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
+    const box=det.detection.box;
+    const sw=c.width/v.videoWidth,sh=c.height/v.videoHeight;
+    ctx.strokeStyle='#16a34a';ctx.lineWidth=3;
+    ctx.strokeRect(box.x*sw,box.y*sh,box.width*sw,box.height*sh);
+  }catch(e){toast('采集失败：'+e.message,'err');}
+};
+$('saveEnroll').onclick=function(){
+  const name=$('enrollName').value.trim();
+  if(!name){toast('请填写姓名','err');return;}
+  if(!STATE.pendingDesc){toast('请先采集人脸','err');return;}
+  if(STATE.people.some(p=>p.name===name)){toast('该姓名已存在，请换一个','err');return;}
+  STATE.people.push({id:Date.now(),name:name,desc:STATE.pendingDesc,photo:STATE.pendingPhoto});
+  saveDB();
+  addLog(name,'录入人脸');
+  $('enrollName').value='';$('enrollPreview').innerHTML='采集后将在此显示人脸截图';
+  $('enrollPreview').style.background='';$('saveEnroll').disabled=true;
+  STATE.pendingDesc=null;STATE.pendingPhoto=null;
+  toast('已录入：'+name,'ok');
+  clearCanvas($('canvas2'));
+};
+
+/* ================= 名单管理 ================= */
+function renderRoster(){
+  const tbody=$('rosterBody'),empty=$('rosterEmpty');
+  if(!STATE.roster.names.length){tbody.innerHTML='';empty.style.display='block';}
+  else{
+    empty.style.display='none';
+    const signed=new Set(STATE.logs.filter(l=>l.action==='签到成功').map(l=>l.name));
+    let html='';
+    STATE.roster.names.forEach((n,i)=>{
+      const isSigned=signed.has(n);
+      const statusTag=isSigned?'<span class="tag tag-ok">已签到</span>':'<span class="tag tag-wait">未签到</span>';
+      html+=`<tr>
+        <td>${i+1}</td>
+        <td>${esc(n)}</td>
+        <td>${STATE.roster.active?'<span class="tag tag-on">生效中</span>':'<span class="tag tag-off">已失效</span>'}</td>
+        <td>${statusTag}</td>
+        <td><button class="mini-btn" data-del="${i}">删除</button></td>
+      </tr>`;
+    });
+    tbody.innerHTML=html;
+  }
+  const st=$('rosterStatus');
+  st.innerHTML=STATE.roster.active
+    ? `本次名单<b style="color:#4ade80">生效中</b> · 共 ${STATE.roster.names.length} 人`
+    : `名单<b style="color:var(--muted)">未生效</b> · 需点「生效名单」后才作为签到目标`;
+  // 统计
+  const signed=new Set(STATE.logs.filter(l=>l.action==='签到成功').map(l=>l.name));
+  const total=STATE.roster.names.length;
+  const s=STATE.roster.names.filter(n=>signed.has(n)).length;
+  $('stTotal').textContent=total;
+  $('stSigned').textContent=s;
+  $('stAbsent').textContent=total-s;
+  $('stRate').textContent=total?Math.round(s/total*100)+'%':'0%';
+  // 生效/失效按钮状态
+  $('rosterOn').disabled=STATE.roster.active;
+  $('rosterOff').disabled=!STATE.roster.active;
+  tbody.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick=()=>{STATE.roster.names.splice(Number(b.dataset.del),1);saveDB();renderRoster();toast('已删除');};
+  });
+}
+$('addName').onclick=function(){
+  const n=$('newName').value.trim();if(!n){toast('请输入姓名','err');return;}
+  if(STATE.roster.names.includes(n)){toast('名单中已有此人','err');return;}
+  STATE.roster.names.push(n);$('newName').value='';saveDB();renderRoster();toast('已添加：'+n,'ok');
+};
+$('newName').onkeydown=function(e){if(e.key==='Enter')$('addName').onclick();};
+$('rosterOn').onclick=function(){STATE.roster.active=true;saveDB();renderRoster();addLog('系统','名单生效（'+STATE.roster.names.length+'人）');toast('名单已生效','ok');};
+$('rosterOff').onclick=function(){STATE.roster.active=false;saveDB();renderRoster();addLog('系统','名单失效');toast('名单已失效');};
+
+/* ================= 日志 ================= */
+function renderLog(){
+  const c=$('logConsole');
+  if(!STATE.logs.length){c.textContent='[暂无签到记录]';return;}
+  c.innerHTML=STATE.logs.slice(-100).map(l=>{
+    const s=STATE.logs.indexOf(l)===STATE.logs.length-1?'→':'';
+    return `<span class="ts">[${fmtLogTime(l.t)}]</span> ${esc(l.name)} · ${esc(l.action)}`;
+  }).join('\n');
+  c.scrollTop=c.scrollHeight;
+}
+$('exportLog').onclick=function(){
+  if(!STATE.logs.length){toast('暂无日志可导出','err');return;}
+  let txt='人脸签到日志导出\n'+'='.repeat(40)+'\n';
+  STATE.logs.forEach(l=>{txt+=`[${new Date(l.t).toLocaleString()}] ${l.name} - ${l.action}\n`;});
+  const blob=new Blob(['\ufeff'+txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='签到日志_'+nowStr().replace(/[: ]/g,'')+'.log';
+  a.click();URL.revokeObjectURL(a.href);
+  toast('日志已导出','ok');
+};
+$('clearLog').onclick=function(){
+  if(!STATE.logs.length){toast('日志已为空');return;}
+  if(confirm('确定清空所有签到日志？')){STATE.logs=[];saveLogs();renderLog();toast('日志已清空');}
+};
+
+/* ================= 导航 ================= */
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.onclick=function(){
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    $('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='log')renderLog();
+    if(btn.dataset.view==='roster')renderRoster();
+    if(btn.dataset.view==='checkin'&&STATE.streams.checkin)loopCheckin();
+  };
+});
+
+/* ================= 按钮绑定 ================= */
+$('startCam').onclick=()=>startCam('checkin');
+$('stopCam').onclick=()=>stopCam('checkin');
+$('startCam2').onclick=()=>startCam('enroll');
+
+/* ================= 初始化 ================= */
+loadDB(); loadLogs(); renderLog(); renderRoster();
+function boot(){ if(window.faceapi){ initModel(); } else { toast('人脸识别库加载中…'); setTimeout(boot,300); } }
+boot();
+window.addEventListener('beforeunload',()=>{Object.values(STATE.streams).forEach(s=>{if(s)s.getTracks().forEach(t=>t.stop());});});
+</script>
+</body>
+</html>
