@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吃毒药游戏</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#ef4444',
+                        secondary: '#22c55e',
+                        neutral: '#f3f4f6',
+                        dark: '#1f2937'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+                        'pulse-red': 'pulse-red 1s infinite',
+                        'flip': 'flip 0.6s ease-in-out',
+                        'bounce-in': 'bounce-in 0.5s'
+                    },
+                    keyframes: {
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+                        },
+                        'pulse-red': {
+                            '0%, 100%': { backgroundColor: '#ef4444' },
+                            '50%': { backgroundColor: '#dc2626' }
+                        },
+                        flip: {
+                            '0%': { transform: 'rotateY(0deg)' },
+                            '100%': { transform: 'rotateY(180deg)' }
+                        },
+                        'bounce-in': {
+                            '0%': { transform: 'scale(0.3)', opacity: 0 },
+                            '50%': { transform: 'scale(1.05)' },
+                            '70%': { transform: 'scale(0.9)' },
+                            '100%': { transform: 'scale(1)', opacity: 1 }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card-flip {
+                perspective: 1000px;
+            }
+            .card-inner {
+                transition: transform 0.6s;
+                transform-style: preserve-3d;
+            }
+            .card-flipped .card-inner {
+                transform: rotateY(180deg);
+            }
+            .card-front, .card-back {
+                backface-visibility: hidden;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+            .card-front {
+                transform: rotateY(180deg);
+            }
+            .glass-effect {
+                background: rgba(255, 255, 255, 0.25);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 游戏标题 -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-dark mb-2">吃毒药游戏</h1>
+            <p class="text-gray-600">小心选择，不要吃到毒药哦！</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+            <!-- 左侧设置面板 -->
+            <div class="lg:w-1/3 bg-white rounded-xl shadow-lg p-6 glass-effect">
+                <h2 class="text-2xl font-bold mb-4 text-dark border-b pb-2">游戏设置</h2>
+                
+                <!-- 卡片数量设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">卡片数量</h3>
+                    
+                    <div class="flex items-center justify-between mb-3">
+                        <label for="poison-cards" class="text-primary font-medium">毒药牌 (红色):</label>
+                        <div class="flex items-center">
+                            <button id="decrease-poison" class="bg-gray-200 hover:bg-gray-300 rounded-l px-3 py-1">
+                                <i class="fa fa-minus"></i>
+                            </button>
+                            <input type="number" id="poison-cards" min="1" max="15" value="3" 
+                                class="w-16 text-center border-y border-gray-300 py-1">
+                            <button id="increase-poison" class="bg-gray-200 hover:bg-gray-300 rounded-r px-3 py-1">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mb-3">
+                        <label for="safe-cards" class="text-secondary font-medium">安全牌 (绿色):</label>
+                        <div class="flex items-center">
+                            <button id="decrease-safe" class="bg-gray-200 hover:bg-gray-300 rounded-l px-3 py-1">
+                                <i class="fa fa-minus"></i>
+                            </button>
+                            <input type="number" id="safe-cards" min="1" max="15" value="9" 
+                                class="w-16 text-center border-y border-gray-300 py-1">
+                            <button id="increase-safe" class="bg-gray-200 hover:bg-gray-300 rounded-r px-3 py-1">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">总牌数:</span>
+                        <span id="total-cards" class="font-bold text-lg">12</span>
+                    </div>
+                    
+                    <!-- 自动分配按钮 -->
+                    <button id="auto-allocate" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors">
+                        <i class="fa fa-random mr-2"></i>自动分配
+                    </button>
+                </div>
+                
+                <!-- 惩罚设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">惩罚设置</h3>
+                    <div id="punishments-container" class="space-y-2 mb-3">
+                        <div class="flex items-center punishment-item">
+                            <input type="text" value="表演一个小节目" class="flex-1 border rounded-l px-3 py-2">
+                            <button class="remove-punishment bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-r">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center punishment-item">
+                            <input type="text" value="喝一杯水" class="flex-1 border rounded-l px-3 py-2">
+                            <button class="remove-punishment bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-r">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center punishment-item">
+                            <input type="text" value="唱一首歌" class="flex-1 border rounded-l px-3 py-2">
+                            <button class="remove-punishment bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-r">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="add-punishment" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded-lg transition-colors">
+                        <i class="fa fa-plus mr-2"></i>添加惩罚
+                    </button>
+                </div>
+                
+                <!-- 玩家设置 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">玩家设置</h3>
+                    <div class="flex items-center justify-between">
+                        <label for="player-count" class="font-medium">玩家数量:</label>
+                        <div class="flex items-center">
+                            <button id="decrease-players" class="bg-gray-200 hover:bg-gray-300 rounded-l px-3 py-1">
+                                <i class="fa fa-minus"></i>
+                            </button>
+                            <input type="number" id="player-count" min="2" max="10" value="4" 
+                                class="w-16 text-center border-y border-gray-300 py-1">
+                            <button id="increase-players" class="bg-gray-200 hover:bg-gray-300 rounded-r px-3 py-1">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 游戏控制按钮 -->
+                <div class="flex gap-3">
+                    <button id="start-game" class="flex-1 bg-secondary hover:bg-green-600 text-white py-3 px-4 rounded-lg transition-colors font-bold">
+                        <i class="fa fa-play mr-2"></i>开始游戏
+                    </button>
+                    <button id="reset-game" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition-colors font-bold">
+                        <i class="fa fa-refresh mr-2"></i>重置
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 右侧游戏区域 -->
+            <div class="lg:w-2/3 flex flex-col">
+                <!-- 游戏状态 -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 glass-effect">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold">当前玩家</h3>
+                            <p id="current-player" class="text-2xl font-bold text-blue-600">玩家 1</p>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold">剩余卡片</h3>
+                            <p id="remaining-cards" class="text-2xl font-bold">12</p>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold">游戏状态</h3>
+                            <p id="game-status" class="text-2xl font-bold text-gray-500">等待开始</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 惩罚显示区域 -->
+                <div id="punishment-display" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6 animate-bounce-in">
+                    <div class="text-center">
+                        <div class="inline-block p-4 rounded-full bg-red-100 mb-4">
+                            <i class="fa fa-exclamation-triangle text-4xl text-primary"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-primary mb-2">糟糕！你吃到毒药了！</h3>
+                        <p class="text-xl mb-4">惩罚内容:</p>
+                        <p id="punishment-text" class="text-2xl font-bold bg-red-50 p-4 rounded-lg"></p>
+                    </div>
+                </div>
+                
+                <!-- 卡片区域 -->
+                <div id="game-board" class="bg-white rounded-xl shadow-lg p-6 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 min-h-[400px]">
+                    <div class="col-span-full flex items-center justify-center text-gray-500">
+                        <div class="text-center">
+                            <i class="fa fa-gamepad text-5xl mb-4"></i>
+                            <p class="text-xl">请设置游戏参数并点击"开始游戏"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置对象
+        const gameConfig = {
+            totalCards: 12,
+            poisonCards: 3,
+            safeCards: 9,
+            punishments: [
+                "表演一个小节目",
+                "喝一杯水",
+                "唱一首歌"
+            ],
+            currentPlayer: 1,
+            totalPlayers: 4,
+            gameStarted: false,
+            remainingCards: 12,
+            flippedCards: [],
+            cards: []
+        };
+
+        // DOM 元素
+        const poisonCardsInput = document.getElementById('poison-cards');
+        const safeCardsInput = document.getElementById('safe-cards');
+        const totalCardsDisplay = document.getElementById('total-cards');
+        const playerCountInput = document.getElementById('player-count');
+        const currentPlayerDisplay = document.getElementById('current-player');
+        const remainingCardsDisplay = document.getElementById('remaining-cards');
+        const gameStatusDisplay = document.getElementById('game-status');
+        const gameBoard = document.getElementById('game-board');
+        const punishmentDisplay = document.getElementById('punishment-display');
+        const punishmentText = document.getElementById('punishment-text');
+        const startGameBtn = document.getElementById('start-game');
+        const resetGameBtn = document.getElementById('reset-game');
+        const autoAllocateBtn = document.getElementById('auto-allocate');
+        const punishmentsContainer = document.getElementById('punishments-container');
+        const addPunishmentBtn = document.getElementById('add-punishment');
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 毒药牌数量调整
+            document.getElementById('decrease-poison').addEventListener('click', () => {
+                if (gameConfig.poisonCards > 1) {
+                    gameConfig.poisonCards--;
+                    updateCardCounts();
+                }
+            });
+            
+            document.getElementById('increase-poison').addEventListener('click', () => {
+                if (gameConfig.poisonCards < 15 && gameConfig.totalCards < 20) {
+                    gameConfig.poisonCards++;
+                    updateCardCounts();
+                }
+            });
+            
+            // 安全牌数量调整
+            document.getElementById('decrease-safe').addEventListener('click', () => {
+                if (gameConfig.safeCards > 1) {
+                    gameConfig.safeCards--;
+                    updateCardCounts();
+                }
+            });
+            
+            document.getElementById('increase-safe').addEventListener('click', () => {
+                if (gameConfig.safeCards < 15 && gameConfig.totalCards < 20) {
+                    gameConfig.safeCards++;
+                    updateCardCounts();
+                }
+            });
+            
+            // 玩家数量调整
+            document.getElementById('decrease-players').addEventListener('click', () => {
+                if (gameConfig.totalPlayers > 2) {
+                    gameConfig.totalPlayers--;
+                    playerCountInput.value = gameConfig.totalPlayers;
+                }
+            });
+            
+            document.getElementById('increase-players').addEventListener('click', () => {
+                if (gameConfig.totalPlayers < 10) {
+                    gameConfig.totalPlayers++;
+                    playerCountInput.value = gameConfig.totalPlayers;
+                }
+            });
+            
+            // 输入框变化监听
+            poisonCardsInput.addEventListener('change', () => {
+                let value = parseInt(poisonCardsInput.value);
+                if (isNaN(value) || value < 1) value = 1;
+                if (value > 15) value = 15;
+                gameConfig.poisonCards = value;
+                updateCardCounts();
+            });
+            
+            safeCardsInput.addEventListener('change', () => {
+                let value = parseInt(safeCardsInput.value);
+                if (isNaN(value) || value < 1) value = 1;
+                if (value > 15) value = 15;
+                gameConfig.safeCards = value;
+                updateCardCounts();
+            });
+            
+            playerCountInput.addEventListener('change', () => {
+                let value = parseInt(playerCountInput.value);
+                if (isNaN(value) || value < 2) value = 2;
+                if (value > 10) value = 10;
+                gameConfig.totalPlayers = value;
+                playerCountInput.value = gameConfig.totalPlayers;
+            });
+            
+            // 开始游戏按钮
+            startGameBtn.addEventListener('click', startGame);
+            
+            // 重置游戏按钮
+            resetGameBtn.addEventListener('click', resetGame);
+            
+            // 自动分配按钮
+            autoAllocateBtn.addEventListener('click', autoAllocateCards);
+            
+            // 添加惩罚按钮
+            addPunishmentBtn.addEventListener('click', addPunishment);
+            
+            // 为现有的惩罚项添加删除按钮事件
+            document.querySelectorAll('.remove-punishment').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (document.querySelectorAll('.punishment-item').length > 1) {
+                        this.parentElement.remove();
+                        updatePunishmentsArray();
+                    } else {
+                        alert('至少需要保留一个惩罚内容！');
+                    }
+                });
+            });
+        }
+
+        // 更新卡片数量显示
+        function updateCardCounts() {
+            gameConfig.totalCards = gameConfig.poisonCards + gameConfig.safeCards;
+            poisonCardsInput.value = gameConfig.poisonCards;
+            safeCardsInput.value = gameConfig.safeCards;
+            totalCardsDisplay.textContent = gameConfig.totalCards;
+            
+            // 如果游戏已开始，不允许更改
+            if (gameConfig.gameStarted) {
+                gameStatusDisplay.textContent = '请先重置游戏';
+                gameStatusDisplay.className = 'text-2xl font-bold text-yellow-500';
+            }
+        }
+
+        // 自动分配卡片
+        function autoAllocateCards() {
+            // 根据玩家数量自动分配毒药牌和安全牌
+            const playerCount = gameConfig.totalPlayers;
+            // 确保每个玩家至少有一个毒药牌的概率
+            const minPoisonCards = Math.max(1, Math.floor(playerCount / 2));
+            // 总牌数为玩家数量的2-3倍
+            const totalCards = Math.floor(playerCount * (Math.random() * 1 + 2));
+            
+            gameConfig.poisonCards = Math.min(minPoisonCards + Math.floor(Math.random() * 2), totalCards - 2);
+            gameConfig.safeCards = totalCards - gameConfig.poisonCards;
+            
+            updateCardCounts();
+        }
+
+        // 更新惩罚数组
+        function updatePunishmentsArray() {
+            const punishmentInputs = document.querySelectorAll('#punishments-container input');
+            gameConfig.punishments = Array.from(punishmentInputs).map(input => input.value.trim()).filter(value => value !== '');
+            
+            // 确保至少有一个惩罚内容
+            if (gameConfig.punishments.length === 0) {
+                gameConfig.punishments = ["表演一个小节目"];
+                addPunishmentInput("表演一个小节目");
+            }
+        }
+
+        // 添加惩罚输入框
+        function addPunishmentInput(value = "") {
+            const punishmentDiv = document.createElement('div');
+            punishmentDiv.className = 'flex items-center punishment-item animate-bounce-in';
+            punishmentDiv.innerHTML = `
+                <input type="text" value="${value}" class="flex-1 border rounded-l px-3 py-2" placeholder="输入惩罚内容">
+                <button class="remove-punishment bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-r">
+                    <i class="fa fa-times"></i>
+                </button>
+            `;
+            
+            // 添加删除按钮事件
+            punishmentDiv.querySelector('.remove-punishment').addEventListener('click', function() {
+                if (document.querySelectorAll('.punishment-item').length > 1) {
+                    this.parentElement.remove();
+                    updatePunishmentsArray();
+                } else {
+                    alert('至少需要保留一个惩罚内容！');
+                }
+            });
+            
+            // 添加输入变化事件
+            punishmentDiv.querySelector('input').addEventListener('change', updatePunishmentsArray);
+            
+            punishmentsContainer.appendChild(punishmentDiv);
+        }
+
+        // 添加惩罚
+        function addPunishment() {
+            addPunishmentInput();
+            // 聚焦到新添加的输入框
+            const newInput = punishmentsContainer.lastElementChild.querySelector('input');
+            newInput.focus();
+        }
+
+        // 开始游戏
+        function startGame() {
+            // 更新惩罚数组
+            updatePunishmentsArray();
+            
+            // 重置游戏状态
+            gameConfig.gameStarted = true;
+            gameConfig.currentPlayer = 1;
+            gameConfig.remainingCards = gameConfig.totalCards;
+            gameConfig.flippedCards = [];
+            gameConfig.cards = [];
+            
+            // 更新显示
+            currentPlayerDisplay.textContent = `玩家 ${gameConfig.currentPlayer}`;
+            remainingCardsDisplay.textContent = gameConfig.remainingCards;
+            gameStatusDisplay.textContent = '游戏进行中';
+            gameStatusDisplay.className = 'text-2xl font-bold text-green-500';
+            punishmentDisplay.classList.add('hidden');
+            
+            // 生成卡片
+            generateCards();
+            
+            // 渲染游戏板
+            renderGameBoard();
+        }
+
+        // 重置游戏
+        function resetGame() {
+            gameConfig.gameStarted = false;
+            
+            // 更新显示
+            gameStatusDisplay.textContent = '等待开始';
+            gameStatusDisplay.className = 'text-2xl font-bold text-gray-500';
+            punishmentDisplay.classList.add('hidden');
+            
+            // 清空游戏板
+            gameBoard.innerHTML = `
+                <div class="col-span-full flex items-center justify-center text-gray-500">
+                    <div class="text-center">
+                        <i class="fa fa-gamepad text-5xl mb-4"></i>
+                        <p class="text-xl">请设置游戏参数并点击"开始游戏"</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 生成卡片
+        function generateCards() {
+            gameConfig.cards = [];
+            
+            // 添加毒药牌
+            for (let i = 0; i < gameConfig.poisonCards; i++) {
+                gameConfig.cards.push({
+                    id: i,
+                    type: 'poison',
+                    isFlipped: false
+                });
+            }
+            
+            // 添加安全牌
+            for (let i = gameConfig.poisonCards; i < gameConfig.totalCards; i++) {
+                gameConfig.cards.push({
+                    id: i,
+                    type: 'safe',
+                    isFlipped: false
+                });
+            }
+            
+            // 洗牌
+            shuffleArray(gameConfig.cards);
+        }
+
+        // 洗牌算法
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // 渲染游戏板
+        function renderGameBoard() {
+            gameBoard.innerHTML = '';
+            
+            // 根据卡片数量调整网格列数
+            let cols = 3;
+            if (gameConfig.totalCards > 8) cols = 4;
+            if (gameConfig.totalCards > 12) cols = 5;
+            if (gameConfig.totalCards > 18) cols = 6;
+            
+            gameBoard.className = `bg-white rounded-xl shadow-lg p-6 grid grid-cols-${cols} gap-4`;
+            
+            // 创建卡片元素
+            gameConfig.cards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card-flip h-24 cursor-pointer';
+                cardElement.dataset.cardId = card.id;
+                
+                cardElement.innerHTML = `
+                    <div class="card-inner w-full h-full relative">
+                        <!-- 卡片背面 -->
+                        <div class="card-back w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center shadow-md hover:shadow-lg transition-shadow">
+                            <div class="text-white text-center">
+                                <i class="fa fa-question-circle text-3xl mb-1"></i>
+                                <p class="text-sm">点击翻转</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 卡片正面 -->
+                        <div class="card-front w-full h-full rounded-lg flex items-center justify-center shadow-md">
+                            <div class="text-white text-center">
+                                <i class="fa ${card.type === 'poison' ? 'fa-skull' : 'fa-check-circle'} text-3xl mb-1"></i>
+                                <p class="text-sm">${card.type === 'poison' ? '毒药' : '安全'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 设置卡片正面颜色
+                const cardFront = cardElement.querySelector('.card-front');
+                if (card.type === 'poison') {
+                    cardFront.className += ' bg-gradient-to-br from-red-500 to-red-700';
+                } else {
+                    cardFront.className += ' bg-gradient-to-br from-green-500 to-green-700';
+                }
+                
+                // 添加点击事件
+                cardElement.addEventListener('click', () => flipCard(card.id));
+                
+                gameBoard.appendChild(cardElement);
+            });
+        }
+
+        // 翻转卡片
+        function flipCard(cardId) {
+            // 如果游戏未开始或卡片已翻开，不做任何操作
+            if (!gameConfig.gameStarted) return;
+            
+            const cardIndex = gameConfig.cards.findIndex(card => card.id === cardId);
+            const card = gameConfig.cards[cardIndex];
+            
+            if (card.isFlipped) return;
+            
+            // 标记卡片为已翻开
+            card.isFlipped = true;
+            gameConfig.flippedCards.push(cardId);
+            gameConfig.remainingCards--;
+            
+            // 更新剩余卡片显示
+            remainingCardsDisplay.textContent = gameConfig.remainingCards;
+            
+            // 找到对应的DOM元素并添加翻转类
+            const cardElement = document.querySelector(`[data-card-id="${cardId}"]`);
+            cardElement.classList.add('card-flipped');
+            cardElement.style.pointerEvents = 'none'; // 防止重复点击
+            
+            // 检查卡片类型
+            if (card.type === 'poison') {
+                // 毒药牌，显示惩罚
+                setTimeout(() => {
+                    showPunishment();
+                    // 添加震动效果
+                    cardElement.classList.add('animate-shake');
+                    // 添加脉冲效果
+                    const cardFront = cardElement.querySelector('.card-front');
+                    cardFront.classList.add('animate-pulse-red');
+                }, 600); // 等待翻转动画完成
+            } else {
+                // 安全牌，切换到下一个玩家
+                setTimeout(() => {
+                    nextPlayer();
+                }, 600); // 等待翻转动画完成
+            }
+            
+            // 检查游戏是否结束
+            if (gameConfig.remainingCards === 0) {
+                setTimeout(() => {
+                    endGame();
+                }, 1000);
+            }
+        }
+
+        // 显示惩罚
+        function showPunishment() {
+            // 随机选择一个惩罚
+            const randomIndex = Math.floor(Math.random() * gameConfig.punishments.length);
+            const punishment = gameConfig.punishments[randomIndex];
+            
+            // 显示惩罚内容
+            punishmentText.textContent = punishment;
+            punishmentDisplay.classList.remove('hidden');
+            
+            // 播放音效（如果需要）
+            // const audio = new Audio('poison-sound.mp3');
+            // audio.play();
+            
+            // 3秒后隐藏惩罚并切换到下一个玩家
+            setTimeout(() => {
+                punishmentDisplay.classList.add('hidden');
+                nextPlayer();
+            }, 3000);
+        }
+
+        // 切换到下一个玩家
+        function nextPlayer() {
+            gameConfig.currentPlayer++;
+            if (gameConfig.currentPlayer > gameConfig.totalPlayers) {
+                gameConfig.currentPlayer = 1;
+            }
+            currentPlayerDisplay.textContent = `玩家 ${gameConfig.currentPlayer}`;
+        }
+
+        // 游戏结束
+        function endGame() {
+            gameConfig.gameStarted = false;
+            gameStatusDisplay.textContent = '游戏结束';
+            gameStatusDisplay.className = 'text-2xl font-bold text-purple-500';
+            
+            // 显示游戏统计（可选）
+            setTimeout(() => {
+                alert('游戏结束！感谢参与！');
+            }, 500);
+        }
+
+        // 初始化游戏
+        function initGame() {
+            initEventListeners();
+            updateCardCounts();
+        }
+
+        // 页面加载完成后初始化游戏
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>

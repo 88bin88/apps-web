@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>翻图案游戏</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#FBBF24',
+                        accent: '#10B981',
+                        neutral: '#F3F4F6',
+                        'neutral-dark': '#374151'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'flip': 'flip 0.6s ease-in-out',
+                    },
+                    keyframes: {
+                        flip: {
+                            '0%': { transform: 'rotateY(0deg)' },
+                            '50%': { transform: 'rotateY(90deg)' },
+                            '100%': { transform: 'rotateY(180deg)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card-flip {
+                perspective: 1000px;
+            }
+            .card-inner {
+                transition: transform 0.6s;
+                transform-style: preserve-3d;
+            }
+            .card-flipped .card-inner {
+                transform: rotateY(180deg);
+            }
+            .card-front, .card-back {
+                backface-visibility: hidden;
+            }
+            .card-back {
+                transform: rotateY(180deg);
+            }
+            .grid-cols-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+            .grid-cols-4 {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+            .grid-cols-5 {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+            .grid-cols-6 {
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        <!-- 游戏标题和设置按钮 -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-neutral-dark">翻图案游戏</h1>
+            <button id="settings-btn" class="bg-primary text-white p-2 rounded-full hover:bg-opacity-90 transition-all">
+                <i class="fa fa-cog text-xl"></i>
+            </button>
+        </div>
+
+        <!-- 游戏信息 -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-lg font-medium">
+                <span id="flipped-count">0</span> / <span id="total-count">0</span> 已翻开
+            </div>
+            <button id="restart-btn" class="bg-accent text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-all">
+                重新开始
+            </button>
+        </div>
+
+        <!-- 游戏区域 -->
+        <div id="game-container" class="relative w-full aspect-square mb-6">
+            <div id="game-grid" class="grid grid-cols-4 gap-2 w-full h-full">
+                <!-- 游戏卡片将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <!-- 完成提示 -->
+        <div id="completion-message" class="hidden text-center py-4 bg-green-100 text-green-800 rounded-lg mb-6">
+            <p class="text-xl font-bold">恭喜你完成了拼图！</p>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-neutral-dark">游戏设置</h2>
+                <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 网格大小设置 -->
+            <div class="mb-6">
+                <label class="block text-gray-700 font-medium mb-2">网格大小</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="grid-size-btn bg-primary text-white py-2 px-4 rounded-lg" data-size="3">3x3</button>
+                    <button class="grid-size-btn bg-gray-200 text-gray-700 py-2 px-4 rounded-lg" data-size="4">4x4</button>
+                    <button class="grid-size-btn bg-gray-200 text-gray-700 py-2 px-4 rounded-lg" data-size="5">5x5</button>
+                    <button class="grid-size-btn bg-gray-200 text-gray-700 py-2 px-4 rounded-lg" data-size="6">6x6</button>
+                </div>
+            </div>
+
+            <!-- 图案选择 -->
+            <div class="mb-6">
+                <label class="block text-gray-700 font-medium mb-2">选择图案</label>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="pattern-option cursor-pointer border-2 border-primary rounded-lg overflow-hidden">
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/4657002b394442b18300145406673840~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688571&x-signature=0qY1d%2B0nA894r334WzW%2BC5849qM%3D" alt="图案1" class="w-full h-20 object-cover" data-pattern="pattern1">
+                    </div>
+                    <div class="pattern-option cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden">
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/06382c76334746f098997614783665b3~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688571&x-signature=11V%2B6%2FvR3%2Fj3bXvL4n%2FO%2B3q2Z4%3D" alt="图案2" class="w-full h-20 object-cover" data-pattern="pattern2">
+                    </div>
+                    <div class="pattern-option cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden">
+                        <img src="https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/7321f06681954372b708482b36245149~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688572&x-signature=X9J7%2Fh4n5g6k8m9p0q2r3t5y7u%3D" alt="图案3" class="w-full h-20 object-cover" data-pattern="pattern3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 本地图片上传 -->
+            <div class="mb-6">
+                <label class="block text-gray-700 font-medium mb-2">上传本地图片</label>
+                <div class="flex items-center justify-center w-full">
+                    <label for="image-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fa fa-cloud-upload text-3xl text-gray-400 mb-2"></i>
+                            <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">点击上传</span> 或拖放</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">SVG, PNG, JPG 或 GIF (MAX. 800x400px)</p>
+                        </div>
+                        <input id="image-upload" type="file" class="hidden" accept="image/*" />
+                    </label>
+                </div>
+            </div>
+
+            <!-- 确认按钮 -->
+            <button id="apply-settings" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-opacity-90 transition-all font-medium text-lg">
+                应用设置
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏状态
+        const gameState = {
+            gridSize: 4,
+            totalCards: 16,
+            flippedCards: 0,
+            isComplete: false,
+            pattern: 'pattern1',
+            customImage: null,
+            cardStates: []
+        };
+
+        // 预定义的图案
+        const patterns = {
+            pattern1: 'https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/4657002b394442b18300145406673840~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688571&x-signature=0qY1d%2B0nA894r334WzW%2BC5849qM%3D',
+            pattern2: 'https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/06382c76334746f098997614783665b3~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688571&x-signature=11V%2B6%2FvR3%2Fj3bXvL4n%2FO%2B3q2Z4%3D',
+            pattern3: 'https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/7321f06681954372b708482b36245149~tplv-a9rns2rl98-image.image?rcl=2026050406354815000000000199660&rk3s=8e244e9e&rrcfp=f06b921b&x-expires=1756688572&x-signature=X9J7%2Fh4n5g6k8m9p0q2r3t5y7u%3D'
+        };
+
+        // DOM 元素
+        const gameGrid = document.getElementById('game-grid');
+        const flippedCountEl = document.getElementById('flipped-count');
+        const totalCountEl = document.getElementById('total-count');
+        const completionMessage = document.getElementById('completion-message');
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeModalBtn = document.getElementById('close-modal');
+        const applySettingsBtn = document.getElementById('apply-settings');
+        const restartBtn = document.getElementById('restart-btn');
+        const gridSizeBtns = document.querySelectorAll('.grid-size-btn');
+        const patternOptions = document.querySelectorAll('.pattern-option');
+        const imageUpload = document.getElementById('image-upload');
+
+        // 初始化游戏
+        function initGame() {
+            // 更新游戏状态
+            gameState.totalCards = gameState.gridSize * gameState.gridSize;
+            gameState.flippedCards = 0;
+            gameState.isComplete = false;
+            gameState.cardStates = Array(gameState.totalCards).fill(false);
+            
+            // 更新UI
+            flippedCountEl.textContent = '0';
+            totalCountEl.textContent = gameState.totalCards;
+            completionMessage.classList.add('hidden');
+            
+            // 设置网格布局
+            gameGrid.className = `grid gap-2 w-full h-full`;
+            gameGrid.classList.add(`grid-cols-${gameState.gridSize}`);
+            
+            // 清空并重新生成卡片
+            gameGrid.innerHTML = '';
+            
+            // 创建卡片
+            for (let i = 0; i < gameState.totalCards; i++) {
+                const card = createCard(i);
+                gameGrid.appendChild(card);
+            }
+            
+            // 加载并分割图片
+            loadAndSplitImage();
+        }
+
+        // 创建单个卡片
+        function createCard(index) {
+            const card = document.createElement('div');
+            card.className = 'card-flip w-full aspect-square';
+            card.dataset.index = index;
+            
+            card.innerHTML = `
+                <div class="card-inner relative w-full h-full">
+                    <div class="card-front absolute w-full h-full bg-secondary rounded-lg flex items-center justify-center">
+                        <span class="text-4xl font-bold">?</span>
+                    </div>
+                    <div class="card-back absolute w-full h-full bg-white rounded-lg overflow-hidden">
+                        <img src="" alt="图案片段" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            `;
+            
+            // 添加点击事件
+            card.addEventListener('click', () => flipCard(index, card));
+            
+            return card;
+        }
+
+        // 翻牌逻辑
+        function flipCard(index, cardElement) {
+            // 如果卡片已翻开或游戏已完成，则不执行操作
+            if (gameState.cardStates[index] || gameState.isComplete) {
+                return;
+            }
+            
+            // 更新卡片状态
+            gameState.cardStates[index] = true;
+            gameState.flippedCards++;
+            
+            // 更新UI
+            cardElement.classList.add('card-flipped');
+            flippedCountEl.textContent = gameState.flippedCards;
+            
+            // 检查游戏是否完成
+            if (gameState.flippedCards === gameState.totalCards) {
+                gameState.isComplete = true;
+                completionMessage.classList.remove('hidden');
+            }
+        }
+
+        // 加载并分割图片
+        function loadAndSplitImage() {
+            const imageUrl = gameState.customImage || patterns[gameState.pattern];
+            const image = new Image();
+            
+            image.onload = function() {
+                // 创建临时画布来分割图片
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const pieceWidth = image.width / gameState.gridSize;
+                const pieceHeight = image.height / gameState.gridSize;
+                
+                canvas.width = pieceWidth;
+                canvas.height = pieceHeight;
+                
+                // 为每个卡片设置对应的图片片段
+                const cards = document.querySelectorAll('.card-back img');
+                cards.forEach((cardImg, index) => {
+                    const row = Math.floor(index / gameState.gridSize);
+                    const col = index % gameState.gridSize;
+                    
+                    // 在画布上绘制图片的对应部分
+                    ctx.clearRect(0, 0, pieceWidth, pieceHeight);
+                    ctx.drawImage(
+                        image,
+                        col * pieceWidth, row * pieceHeight, pieceWidth, pieceHeight,
+                        0, 0, pieceWidth, pieceHeight
+                    );
+                    
+                    // 将画布内容转换为图片URL并设置给卡片
+                    cardImg.src = canvas.toDataURL();
+                });
+            };
+            
+            image.onerror = function() {
+                console.error('图片加载失败');
+                // 使用默认图案
+                gameState.customImage = null;
+                loadAndSplitImage();
+            };
+            
+            image.src = imageUrl;
+        }
+
+        // 重新开始游戏
+        function restartGame() {
+            // 重置卡片状态
+            gameState.cardStates = Array(gameState.totalCards).fill(false);
+            gameState.flippedCards = 0;
+            gameState.isComplete = false;
+            
+            // 更新UI
+            flippedCountEl.textContent = '0';
+            completionMessage.classList.add('hidden');
+            
+            // 翻转所有卡片回到背面
+            const cards = document.querySelectorAll('.card-flip');
+            cards.forEach(card => {
+                card.classList.remove('card-flipped');
+            });
+        }
+
+        // 事件监听器
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+        });
+        
+        closeModalBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+        
+        restartBtn.addEventListener('click', restartGame);
+        
+        // 点击模态框外部关闭
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.add('hidden');
+            }
+        });
+        
+        // 网格大小选择
+        gridSizeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 更新按钮样式
+                gridSizeBtns.forEach(b => {
+                    b.classList.remove('bg-primary', 'text-white');
+                    b.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                btn.classList.remove('bg-gray-200', 'text-gray-700');
+                btn.classList.add('bg-primary', 'text-white');
+                
+                // 更新网格大小
+                gameState.gridSize = parseInt(btn.dataset.size);
+            });
+        });
+        
+        // 图案选择
+        patternOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // 更新边框样式
+                patternOptions.forEach(opt => {
+                    opt.classList.remove('border-primary');
+                    opt.classList.add('border-gray-200');
+                });
+                option.classList.remove('border-gray-200');
+                option.classList.add('border-primary');
+                
+                // 更新选中的图案
+                gameState.pattern = option.querySelector('img').dataset.pattern;
+                gameState.customImage = null;
+            });
+        });
+        
+        // 本地图片上传
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    // 重置图案选择
+                    patternOptions.forEach(opt => {
+                        opt.classList.remove('border-primary');
+                        opt.classList.add('border-gray-200');
+                    });
+                    
+                    // 设置自定义图片
+                    gameState.customImage = event.target.result;
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // 应用设置
+        applySettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+            initGame();
+        });
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
